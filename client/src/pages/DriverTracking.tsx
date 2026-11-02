@@ -290,7 +290,7 @@ export default function DriverTracking() {
                   }`}
                 >
                   <Navigation size={18} />
-                  {sharing ? "Stop sharing location" : "Show My Location"}
+                  {sharing ? "Stop live location" : "Enable location access"}
                 </button>
 
                 <button

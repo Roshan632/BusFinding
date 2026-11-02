@@ -8,7 +8,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
 import { createServer } from "node:http";
-import { pool, query, ensureDatabaseSchema } from "./db.js";
+import { pool, query, ensureDatabaseSchema, ensureDefaultAdmin } from "./db.js";
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes("REPLACE")) {
   throw new Error("Set a strong JWT_SECRET in the server .env file before starting the API.");
@@ -277,6 +277,32 @@ app.post("/api/routes/schedules", authenticate, async (req, res) => {
       assignedBusId = busResult.rows[0]?.id ?? null;
     }
 
+    if (!assignedBusId) {
+      const availableBusResult = await query(
+        `SELECT id FROM buses
+         WHERE status = 'active'
+           AND (driver_id IS NULL OR driver_id = $1)
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [req.user.id]
+      );
+
+      assignedBusId = availableBusResult.rows[0]?.id ?? null;
+
+      if (assignedBusId) {
+        await query(
+          `UPDATE buses
+           SET driver_id = $1, route_id = $2, status = 'active', updated_at = NOW()
+           WHERE id = $3`,
+          [req.user.id, finalRouteId, assignedBusId]
+        );
+      }
+    }
+
+    if (!assignedBusId) {
+      return res.status(400).json({ message: "No active bus is available for this schedule." });
+    }
+
     const departureDateTime = makeDateTimeFromClock(departureTime);
     const arrivalDateTime = makeDateTimeFromClock(arrivalTime, departureDateTime);
     if (arrivalDateTime < departureDateTime) {
@@ -293,7 +319,7 @@ app.post("/api/routes/schedules", authenticate, async (req, res) => {
          status,
          is_available
        )
-       VALUES ($1, $2, $3, $4, $5, 'scheduled', TRUE)
+       VALUES ($1, $2, $3, $4, $5, 'published', TRUE)
        RETURNING *`,
       [
         req.user.id,
@@ -338,46 +364,47 @@ app.get("/api/routes/search", async (req, res) => {
 
     let queryText = `
       SELECT
-        rs.id,
-        rs.driver_id,
-        rs.route_id,
-        rs.route_name,
-        rs.start_location,
-        rs.end_location,
-        rs.departure_time,
-        rs.arrival_time,
-        rs.stop_name,
-        rs.stop_time,
+        s.id,
+        s.driver_id,
+        s.route_id,
+        r.name AS route_name,
+        r.start_location,
+        r.end_location,
+        CAST(s.departure_at AS TIME) AS departure_time,
+        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        NULL::VARCHAR(150) AS stop_name,
+        NULL::TIME AS stop_time,
         u.name AS driver_name,
         b.bus_number,
-        rs.created_at
-      FROM route_schedules rs
-      LEFT JOIN users u ON u.id = rs.driver_id
-      LEFT JOIN buses b ON b.id = rs.bus_id
-      WHERE rs.is_active = TRUE
+        s.created_at
+      FROM schedules s
+      LEFT JOIN routes r ON r.id = s.route_id
+      LEFT JOIN users u ON u.id = s.driver_id
+      LEFT JOIN buses b ON b.id = s.bus_id
+      WHERE s.status = 'published' AND s.is_available = TRUE
     `;
 
     const params = [];
     let index = 1;
 
     if (from) {
-      queryText += ` AND rs.start_location ILIKE $${index++}`;
+      queryText += ` AND r.start_location ILIKE $${index++}`;
       params.push(`%${from}%`);
     }
 
     if (to) {
-      queryText += ` AND rs.end_location ILIKE $${index++}`;
+      queryText += ` AND r.end_location ILIKE $${index++}`;
       params.push(`%${to}%`);
     }
 
     if (time) {
-      queryText += ` AND rs.departure_time >= ($${index}::time - INTERVAL '30 minutes')`;
-      queryText += ` AND rs.departure_time <= ($${index}::time + INTERVAL '60 minutes')`;
+      queryText += ` AND CAST(s.departure_at AS TIME) >= ($${index}::time - INTERVAL '30 minutes')`;
+      queryText += ` AND CAST(s.departure_at AS TIME) <= ($${index}::time + INTERVAL '60 minutes')`;
       params.push(time);
       index += 1;
     }
 
-    queryText += ` ORDER BY rs.departure_time ASC LIMIT 50`;
+    queryText += ` ORDER BY CAST(s.departure_at AS TIME) ASC LIMIT 50`;
 
     const result = await query(queryText, params);
 
@@ -392,23 +419,24 @@ app.get("/api/routes", async (_req, res) => {
   try {
     const result = await query(`
       SELECT
-        rs.id,
-        rs.driver_id,
-        rs.route_id,
-        rs.route_name,
-        rs.start_location,
-        rs.end_location,
-        rs.departure_time,
-        rs.arrival_time,
-        rs.stop_name,
-        rs.stop_time,
+        s.id,
+        s.driver_id,
+        s.route_id,
+        r.name AS route_name,
+        r.start_location,
+        r.end_location,
+        CAST(s.departure_at AS TIME) AS departure_time,
+        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        NULL::VARCHAR(150) AS stop_name,
+        NULL::TIME AS stop_time,
         u.name AS driver_name,
         b.bus_number
-      FROM route_schedules rs
-      LEFT JOIN users u ON u.id = rs.driver_id
-      LEFT JOIN buses b ON b.id = rs.bus_id
-      WHERE rs.is_active = TRUE
-      ORDER BY rs.departure_time ASC
+      FROM schedules s
+      LEFT JOIN routes r ON r.id = s.route_id
+      LEFT JOIN users u ON u.id = s.driver_id
+      LEFT JOIN buses b ON b.id = s.bus_id
+      WHERE s.status = 'published' AND s.is_available = TRUE
+      ORDER BY CAST(s.departure_at AS TIME) ASC
       LIMIT 100
     `);
 
@@ -427,14 +455,14 @@ app.get("/api/passenger/route-status", async (req, res) => {
 
     let queryText = `
       SELECT
-        rs.id,
-        rs.route_name,
-        rs.start_location,
-        rs.end_location,
-        rs.departure_time,
-        rs.arrival_time,
-        rs.stop_name,
-        rs.stop_time,
+        s.id,
+        r.name AS route_name,
+        r.start_location,
+        r.end_location,
+        CAST(s.departure_at AS TIME) AS departure_time,
+        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        NULL::VARCHAR(150) AS stop_name,
+        NULL::TIME AS stop_time,
         u.name AS driver_name,
         b.bus_number,
         t.id AS trip_id,
@@ -443,9 +471,10 @@ app.get("/api/passenger/route-status", async (req, res) => {
         ST_Y(bl.location::geometry) AS latitude,
         ST_X(bl.location::geometry) AS longitude,
         bl.recorded_at
-      FROM route_schedules rs
-      LEFT JOIN users u ON u.id = rs.driver_id
-      LEFT JOIN buses b ON b.id = rs.bus_id
+      FROM schedules s
+      LEFT JOIN routes r ON r.id = s.route_id
+      LEFT JOIN users u ON u.id = s.driver_id
+      LEFT JOIN buses b ON b.id = s.bus_id
       LEFT JOIN trips t ON t.bus_id = b.id AND t.status = 'active'
       LEFT JOIN LATERAL (
         SELECT location, speed_kmh, recorded_at
@@ -454,31 +483,31 @@ app.get("/api/passenger/route-status", async (req, res) => {
         ORDER BY recorded_at DESC
         LIMIT 1
       ) bl ON TRUE
-      WHERE rs.is_active = TRUE
+      WHERE s.status = 'published' AND s.is_available = TRUE
     `;
 
     const params = [];
     let index = 1;
 
     if (from) {
-      queryText += ` AND rs.start_location ILIKE $${index++}`;
+      queryText += ` AND r.start_location ILIKE $${index++}`;
       params.push(`%${from}%`);
     }
 
     if (to) {
-      queryText += ` AND rs.end_location ILIKE $${index++}`;
+      queryText += ` AND r.end_location ILIKE $${index++}`;
       params.push(`%${to}%`);
     }
 
     if (time) {
-      queryText += ` AND rs.departure_time >= ($${index}::time - INTERVAL '30 minutes')`;
+      queryText += ` AND CAST(s.departure_at AS TIME) >= ($${index}::time - INTERVAL '30 minutes')`;
       params.push(time);
-      queryText += ` AND rs.departure_time <= ($${index}::time + INTERVAL '90 minutes')`;
+      queryText += ` AND CAST(s.departure_at AS TIME) <= ($${index}::time + INTERVAL '90 minutes')`;
       params.push(time);
       index += 1;
     }
 
-    queryText += ` ORDER BY rs.departure_time ASC LIMIT 25`;
+    queryText += ` ORDER BY CAST(s.departure_at AS TIME) ASC LIMIT 25`;
 
     const result = await query(queryText, params);
 
@@ -906,7 +935,7 @@ const isValidUuid = (value) =>
 app.post(
   "/api/driver-requests",
   authenticate,
-  allowRoles("passenger"),
+  allowRoles("passenger", "driver"),
   async (req, res) => {
     try {
       const result = await query(
@@ -1406,14 +1435,26 @@ io.on("connection", (socket) => {
   });
 });
 
-const port = Number(process.env.PORT) || 5000;
+const port = Number(process.env.PORT) || 3000;
 
 try {
   await ensureDatabaseSchema();
+  await ensureDefaultAdmin();
   console.log("Database schema check completed.");
 } catch (error) {
-  console.error("Database schema check failed:", error.message);
+  console.error("Database setup failed:", error.message);
+  process.exit(1);
 }
+
+httpServer.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${port} is already in use. Close the running server or change PORT in the environment.`);
+    process.exit(1);
+  }
+
+  console.error("Server failed to start:", error.message);
+  process.exit(1);
+});
 
 httpServer.listen(port, () => {
   console.log(`Nepal Transit API running on http://localhost:${port}`);

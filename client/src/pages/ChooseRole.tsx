@@ -12,12 +12,15 @@ export default function ChooseRole() {
     if (!user || !token) return;
 
     try {
-      const data = await updateRole("driver", token);
+      const data = await updateRole("passenger", token);
       signIn(data.user, data.token);
-      navigate("/driver", { replace: true });
+      navigate("/verification", {
+        replace: true,
+        state: { intent: "driver" },
+      });
     } catch (error) {
       window.alert(
-        error instanceof Error ? error.message : "Could not update your role."
+        error instanceof Error ? error.message : "Could not continue with driver verification."
       );
     }
   }
@@ -28,7 +31,7 @@ export default function ChooseRole() {
     try {
       const data = await updateRole("passenger", token);
       signIn(data.user, data.token);
-      navigate("/live-map", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : "Could not update your role."

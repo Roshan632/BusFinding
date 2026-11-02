@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { AlertCircle, Check, ShieldCheck, Trash2, UserRound, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const API_URL = "http://localhost:5000/api";
@@ -15,36 +15,62 @@ type UserRow = {
   created_at?: string;
 };
 
+type DriverRequestRow = {
+  id: string;
+  user_id: string;
+  status: "pending" | "approved" | "rejected";
+  requested_at: string;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  name: string;
+  email: string;
+  user_status?: string;
+};
+
 export default function AdminDashboard() {
   const { user, token } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [driverRequests, setDriverRequests] = useState<DriverRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadDashboard = async () => {
     if (!token) return;
 
-    async function loadUsers() {
-      try {
-        const response = await fetch(`${API_URL}/admin/users`, {
+    try {
+      const [usersResponse, requestsResponse] = await Promise.all([
+        fetch(`${API_URL}/admin/users`, {
           headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
+        }),
+        fetch(`${API_URL}/admin/driver-requests?status=pending`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
 
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load users.");
-        }
+      const usersData = await usersResponse.json();
+      const requestsData = await requestsResponse.json();
 
-        setUsers(data.users || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unable to load users.");
-      } finally {
-        setLoading(false);
+      if (!usersResponse.ok) {
+        throw new Error(usersData.message || "Unable to load users.");
       }
-    }
 
-    void loadUsers();
+      if (!requestsResponse.ok) {
+        throw new Error(requestsData.message || "Unable to load driver requests.");
+      }
+
+      setUsers(usersData.users || []);
+      setDriverRequests(requestsData.requests || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadDashboard();
   }, [token]);
 
   async function handleDelete(userId: string) {
@@ -67,10 +93,50 @@ export default function AdminDashboard() {
       }
 
       setUsers((current) => current.filter((item) => item.id !== userId));
+      setDriverRequests((current) => current.filter((item) => item.user_id !== userId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete user.");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleReviewRequest(requestId: string, decision: "approved" | "rejected") {
+    if (!token) return;
+
+    const note = window.prompt(
+      decision === "approved"
+        ? "Add an approval note (optional):"
+        : "Add a rejection note (optional):",
+      ""
+    );
+
+    setReviewingId(requestId);
+
+    try {
+      const response = await fetch(`${API_URL}/admin/driver-requests/${requestId}/review`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          decision,
+          reviewNote: note?.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to review driver request.");
+      }
+
+      await loadDashboard();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to review driver request.");
+    } finally {
+      setReviewingId(null);
     }
   }
 
@@ -112,6 +178,60 @@ export default function AdminDashboard() {
             <p>{error}</p>
           </div>
         )}
+
+        <section className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-slate-100 p-2 text-slate-700">
+                <UserRound size={20} />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-slate-900">Driver requests</p>
+                <p className="text-sm text-slate-500">{driverRequests.length} pending approvals</p>
+              </div>
+            </div>
+          </div>
+
+          {driverRequests.length === 0 ? (
+            <p className="text-sm text-slate-500">No driver requests are waiting for review.</p>
+          ) : (
+            <div className="space-y-3">
+              {driverRequests.map((request) => (
+                <div key={request.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">{request.name}</p>
+                      <p className="text-sm text-slate-600">{request.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleReviewRequest(request.id, "approved")}
+                        disabled={reviewingId === request.id}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        <Check size={16} />
+                        {reviewingId === request.id ? "Reviewing..." : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleReviewRequest(request.id, "rejected")}
+                        disabled={reviewingId === request.id}
+                        className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        <X size={16} />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs uppercase tracking-[0.12em] text-slate-500">
+                    Requested {new Date(request.requested_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex items-center justify-between gap-3">

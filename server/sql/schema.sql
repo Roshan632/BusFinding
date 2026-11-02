@@ -54,20 +54,20 @@ CREATE TABLE IF NOT EXISTS routes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS route_schedules (
+CREATE TABLE IF NOT EXISTS schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    driver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    bus_id UUID REFERENCES buses(id) ON DELETE SET NULL,
-    route_id UUID REFERENCES routes(id) ON DELETE CASCADE,
-    route_name VARCHAR(150) NOT NULL,
-    start_location VARCHAR(150) NOT NULL,
-    end_location VARCHAR(150) NOT NULL,
-    departure_time TIME NOT NULL,
-    arrival_time TIME NOT NULL,
-    stop_name VARCHAR(150),
-    stop_time TIME,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    bus_id UUID NOT NULL REFERENCES buses(id) ON DELETE RESTRICT,
+    driver_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    route_id UUID NOT NULL REFERENCES routes(id) ON DELETE RESTRICT,
+    departure_at TIMESTAMPTZ NOT NULL,
+    expected_arrival_at TIMESTAMPTZ NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft', 'published', 'cancelled')),
+    is_available BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT schedules_valid_times CHECK (expected_arrival_at > departure_at),
+    CONSTRAINT schedules_id_route_unique UNIQUE (id, route_id)
 );
 
 CREATE TABLE IF NOT EXISTS bus_stops (

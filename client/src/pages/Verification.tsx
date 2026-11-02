@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { ShieldCheck, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { uploadDocument } from "../lib/supabase";
@@ -8,9 +8,15 @@ const API_URL = "http://localhost:5000/api";
 
 export default function VerificationPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, token, signIn } = useAuth();
 
-  const isDriver = user?.role === "driver";
+  const requestedRole =
+    location.state && typeof location.state === "object" && "intent" in location.state
+      ? String(location.state.intent)
+      : user?.role ?? "passenger";
+
+  const isDriver = requestedRole === "driver" || user?.role === "driver";
   const [phone, setPhone] = useState("");
   const [busPlateNumber, setBusPlateNumber] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -84,8 +90,30 @@ export default function VerificationPage() {
       }
 
       signIn(data.user, token);
-      setMessage("Verification details uploaded successfully.");
-      setTimeout(() => navigate("/dashboard"), 1000);
+
+      if (isDriver) {
+        const driverRequestResponse = await fetch(`${API_URL}/driver-requests`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const driverRequestData = await driverRequestResponse.json().catch(() => ({}));
+
+        if (!driverRequestResponse.ok) {
+          throw new Error(
+            driverRequestData.message || "Verification saved, but your driver request could not be submitted."
+          );
+        }
+
+        setMessage("Verification details uploaded successfully. Your driver request is pending admin approval.");
+      } else {
+        setMessage("Verification details uploaded successfully.");
+      }
+
+      setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
