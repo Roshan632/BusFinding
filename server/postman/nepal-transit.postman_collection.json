@@ -1,0 +1,294 @@
+{
+  "info": {
+    "name": "Nepal Transit API",
+    "description": "Postman collection for Nepal Transit auth, driver, passenger, and admin flows.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Passenger",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Passenger\",\n  \"email\": \"passenger@example.com\",\n  \"password\": \"StrongPassword123\",\n  \"termsAccepted\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}/auth/register"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"passenger@example.com\",\n  \"password\": \"StrongPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}/auth/login"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Get me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}/auth/me"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Change role to driver",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"driver\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/role",
+              "host": ["{{baseUrl}}/auth/role"],
+              "variable": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Driver",
+      "item": [
+        {
+          "name": "Create route schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeName\": \"Banepa to Kathmandu\",\n  \"startLocation\": \"Banepa\",\n  \"endLocation\": \"Kathmandu\",\n  \"departureTime\": \"08:00\",\n  \"arrivalTime\": \"09:30\",\n  \"stopName\": \"Ratna Park\",\n  \"stopTime\": \"09:15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/routes/schedules",
+              "host": ["{{baseUrl}}/routes/schedules"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Start trip",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/driver/trips/start",
+              "host": ["{{baseUrl}}/driver/trips/start"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Driver assignment",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/driver/assignment",
+              "host": ["{{baseUrl}}/driver/assignment"],
+              "variable": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Passenger",
+      "item": [
+        {
+          "name": "Search routes by time/location",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/routes/search?from=Banepa&to=Kathmandu&time=08:00",
+              "host": ["{{baseUrl}}/routes/search"],
+              "query": [
+                { "key": "from", "value": "Banepa" },
+                { "key": "to", "value": "Kathmandu" },
+                { "key": "time", "value": "08:00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Passenger route status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/passenger/route-status?from=Banepa&to=Kathmandu&time=08:00",
+              "host": ["{{baseUrl}}/passenger/route-status"],
+              "query": [
+                { "key": "from", "value": "Banepa" },
+                { "key": "to", "value": "Kathmandu" },
+                { "key": "time", "value": "08:00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Live buses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/buses/live",
+              "host": ["{{baseUrl}}/buses/live"],
+              "variable": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/overview",
+              "host": ["{{baseUrl}}/admin/overview"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": ["{{baseUrl}}/admin/users"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "List driver requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/driver-requests?status=pending",
+              "host": ["{{baseUrl}}/admin/driver-requests"],
+              "query": [
+                { "key": "status", "value": "pending" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Review driver request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approved\",\n  \"reviewNote\": \"Verified documents and route readiness confirmed.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/driver-requests/{{driverRequestId}}/review",
+              "host": ["{{baseUrl}}/admin/driver-requests/{{driverRequestId}}/review"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Assign bus to driver and route",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"busId\": \"{{busId}}\",\n  \"driverId\": \"{{driverId}}\",\n  \"routeId\": \"{{routeId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/bus-assignment",
+              "host": ["{{baseUrl}}/admin/bus-assignment"],
+              "variable": []
+            }
+          }
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{targetUserId}}",
+              "host": ["{{baseUrl}}/admin/users/{{targetUserId}}"],
+              "variable": []
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "PASTE_JWT_TOKEN_HERE" },
+    { "key": "driverRequestId", "value": "PASTE_DRIVER_REQUEST_UUID_HERE" },
+    { "key": "busId", "value": "PASTE_BUS_UUID_HERE" },
+    { "key": "driverId", "value": "PASTE_DRIVER_UUID_HERE" },
+    { "key": "routeId", "value": "PASTE_ROUTE_UUID_HERE" },
+    { "key": "targetUserId", "value": "PASTE_USER_UUID_HERE" }
+  ]
+}
