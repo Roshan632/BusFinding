@@ -287,7 +287,7 @@ export default function LiveMap() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <Link to="/" className="flex items-center gap-3">
-            <span className="rounded-xl bg-blue-600 p-2.5 text-white">
+            <span className="rounded-xl bg-emerald-600 p-2.5 text-white">
               <BusFront size={24} />
             </span>
 
@@ -313,7 +313,7 @@ export default function LiveMap() {
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-blue-600">
+            <p className="text-sm font-semibold text-emerald-600">
               Passenger map
             </p>
 

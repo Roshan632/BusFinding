@@ -1,5 +1,3 @@
-
-
 import {
   createContext,
   useContext,
@@ -17,6 +15,7 @@ type AuthContextType = {
   loading: boolean;
   signIn: (user: User, token: string) => void;
   signOut: () => void;
+  refreshUser: () => Promise<User | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,8 +24,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
     sessionStorage.getItem("transit_token")
   );
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = sessionStorage.getItem("transit_user");
+
+    if (!storedUser) return null;
+
+    try {
+      return JSON.parse(storedUser) as User;
+    } catch {
+      sessionStorage.removeItem("transit_user");
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
+
+  async function refreshUser() {
+    if (!token) {
+      setUser(null);
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Your session has expired.");
+      }
+
+      const data = await response.json();
+      const nextUser = data.user as User;
+      sessionStorage.setItem("transit_user", JSON.stringify(nextUser));
+      setUser(nextUser);
+      return nextUser;
+    } catch {
+      sessionStorage.removeItem("transit_token");
+      sessionStorage.removeItem("transit_user");
+      setToken(null);
+      setUser(null);
+      return null;
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -55,10 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!cancelled) {
           setUser(data.user);
-          sessionStorage.setItem(
-            "transit_user",
-            JSON.stringify(data.user)
-          );
+          sessionStorage.setItem("transit_user", JSON.stringify(data.user));
         }
       } catch {
         if (!cancelled) {
@@ -97,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, signIn, signOut }}
+      value={{ user, token, loading, signIn, signOut, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BusFront, Eye, EyeOff } from "lucide-react";
 import { login } from "../services/auth";
 import { useAuth } from "../context/AuthContext.tsx";
+import { useToast } from "../components/ToastProvider";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,19 +13,33 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
+  const { showToast } = useToast();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail || !password.trim()) {
+      const message = "Please enter both your email and password.";
+      setError(message);
+      showToast("error", message);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const data = await login(email, password);
+      const data = await login(trimmedEmail, password);
 
       signIn(data.user, data.token);
+      showToast("success", `Welcome back, ${data.user.name.split(" ")[0]}!`);
       navigate("/choose-role");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      const message = err instanceof Error ? err.message : "Login failed.";
+      setError(message);
+      showToast("error", message);
     } finally {
       setLoading(false);
     }

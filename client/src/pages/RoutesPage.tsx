@@ -56,7 +56,7 @@ export default function RoutesPage() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-blue-600 p-3 text-white">
+            <div className="rounded-xl bg-emerald-600 p-3 text-white">
               <BusFront size={24} />
             </div>
             <div>
@@ -69,18 +69,18 @@ export default function RoutesPage() {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <form onSubmit={handleSearch} className="grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto]">
             <Field icon={<MapPin size={18} />}>
-              <input value={from} onChange={(e) => setFrom(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="From" />
+              <input value={from} onChange={(e) => setFrom(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="From" />
             </Field>
 
             <Field icon={<MapPin size={18} />}>
-              <input value={to} onChange={(e) => setTo(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="To" />
+              <input value={to} onChange={(e) => setTo(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="To" />
             </Field>
 
             <Field icon={<Clock3 size={18} />}>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" />
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" />
             </Field>
 
-            <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+            <button type="submit" disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
               <Search size={18} />
               {loading ? "Searching..." : "Search"}
             </button>
@@ -101,7 +101,7 @@ export default function RoutesPage() {
               <article key={route.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="mb-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                    <div className="mb-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                       {route.route_name}
                     </div>
                     <h2 className="text-xl font-bold text-slate-900">

@@ -3,9 +3,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BusFront, Eye, EyeOff } from "lucide-react";
 import { register } from "../services/auth";
+import { useToast } from "../components/ToastProvider";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,15 +19,50 @@ export default function Register() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (trimmedName.length < 2) {
+      const message = "Please enter your full name.";
+      setError(message);
+      showToast("error", message);
+      return;
+    }
+
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      const message = "Please enter a valid email address.";
+      setError(message);
+      showToast("error", message);
+      return;
+    }
+
+    if (password.length < 10) {
+      const message = "Password must be at least 10 characters long.";
+      setError(message);
+      showToast("error", message);
+      return;
+    }
+
+    if (!termsAccepted) {
+      const message = "You must accept the terms and conditions before continuing.";
+      setError(message);
+      showToast("error", message);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(name.trim(), email.trim().toLowerCase(), password,termsAccepted);
+      await register(trimmedName, trimmedEmail, password, termsAccepted);
+      showToast("success", "Account created! Please sign in.");
       navigate("/login", {
         state: { message: "Account created! Please sign in." },
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed.");
+      const message = err instanceof Error ? err.message : "Registration failed.";
+      setError(message);
+      showToast("error", message);
     } finally {
       setLoading(false);
     }
@@ -122,11 +159,11 @@ export default function Register() {
     checked={termsAccepted}
     onChange={(event) => setTermsAccepted(event.target.checked)}
     required
-    className="mt-1 h-4 w-4 accent-blue-600"
+    className="mt-1 h-4 w-4 accent-emerald-600"
   />
   <span>
     I agree to the{" "}
-    <a href="/terms" className="font-semibold text-blue-600 hover:underline">
+    <a href="/terms" className="font-semibold text-emerald-600 hover:underline">
       Terms and Conditions
     </a>{" "}
     and understand how location sharing works.

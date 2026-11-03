@@ -20,6 +20,7 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
+  timezone: process.env.DB_TIMEZONE || "Asia/Kathmandu",
 });
 
 pool.on("error", (error) => {
@@ -85,6 +86,31 @@ export async function ensureDatabaseSchema() {
   for (const statement of migrations) {
     await query(statement);
   }
+
+  const tables = [
+    "users",
+    "driver_requests",
+    "routes",
+    "schedules",
+    "buses",
+    "bus_stops",
+    "route_stops",
+    "trips",
+    "bus_locations",
+  ];
+
+  for (const tableName of tables) {
+    await query(`ALTER TABLE IF EXISTS public.${tableName} ENABLE ROW LEVEL SECURITY;`);
+    await query(`DROP POLICY IF EXISTS "${tableName}_backend_all_access" ON public.${tableName};`);
+    await query(`
+      CREATE POLICY "${tableName}_backend_all_access"
+      ON public.${tableName}
+      FOR ALL
+      TO public
+      USING (true)
+      WITH CHECK (true);
+    `);
+  }
 }
 
 export async function ensureDefaultAdmin() {
@@ -106,9 +132,22 @@ export async function ensureDefaultAdmin() {
       return;
     }
 
-    throw new Error(
-      "The configured admin email already belongs to a different or unavailable account. Resolve it manually."
+    const updatedUser = await query(
+      `UPDATE users
+       SET role = 'admin', status = 'active', updated_at = NOW()
+       WHERE email = $1
+       RETURNING id, role, status` ,
+      [email]
     );
+
+    if (updatedUser.rows[0]?.role !== "admin" || updatedUser.rows[0]?.status !== "active") {
+      throw new Error(
+        "The configured admin email already belongs to a different or unavailable account. Resolve it manually."
+      );
+    }
+
+    console.log(`Admin account ready: ${email}`);
+    return;
   }
 
   const passwordHash = await bcrypt.hash(password, 12);

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { ShieldCheck, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { uploadDocument } from "../lib/supabase";
+import { useToast } from "../components/ToastProvider";
 
 const API_URL = "http://localhost:5000/api";
 
@@ -10,6 +11,7 @@ export default function VerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token, signIn } = useAuth();
+  const { showToast } = useToast();
 
   const requestedRole =
     location.state && typeof location.state === "object" && "intent" in location.state
@@ -32,7 +34,7 @@ export default function VerificationPage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
           <p className="text-slate-700">Please sign in to continue.</p>
-          <Link to="/login" className="mt-4 inline-block font-semibold text-blue-600">
+          <Link to="/login" className="mt-4 inline-block font-semibold text-emerald-600">
             Go to login
           </Link>
         </div>
@@ -46,7 +48,9 @@ export default function VerificationPage() {
     setMessage("");
 
     if (!token) {
-      setError("Your session has expired, please sign in again.");
+      const message = "Your session has expired, please sign in again.";
+      setError(message);
+      showToast("error", message);
       return;
     }
 
@@ -55,6 +59,7 @@ export default function VerificationPage() {
 
       const payload: Record<string, string | null> = {
         phone,
+        requestedRole: isDriver ? "driver" : "passenger",
       };
 
       if (isDriver) {
@@ -108,14 +113,20 @@ export default function VerificationPage() {
           );
         }
 
-        setMessage("Verification details uploaded successfully. Your driver request is pending admin approval.");
+        const successMessage = "Verification details uploaded successfully. Your driver request is pending admin approval.";
+        setMessage(successMessage);
+        showToast("success", successMessage);
       } else {
-        setMessage("Verification details uploaded successfully.");
+        const successMessage = "Verification details uploaded successfully.";
+        setMessage(successMessage);
+        showToast("success", successMessage);
       }
 
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      showToast("error", message);
     } finally {
       setLoading(false);
     }
@@ -126,14 +137,14 @@ export default function VerificationPage() {
       <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-blue-600">
+            <p className="text-sm font-semibold text-emerald-600">
               {isDriver ? "Driver verification" : "Passenger verification"}
             </p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900">
               Upload required documents
             </h1>
           </div>
-          <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">
+          <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
             <ShieldCheck size={32} />
           </div>
         </div>
@@ -146,7 +157,7 @@ export default function VerificationPage() {
             <input
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
               placeholder="+977 98XXXXXXXX"
               required
             />
@@ -161,7 +172,7 @@ export default function VerificationPage() {
                 <input
                   value={busPlateNumber}
                   onChange={(event) => setBusPlateNumber(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   placeholder="Example: BA 1 KA 1234"
                   required
                 />
@@ -207,7 +218,7 @@ export default function VerificationPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              className="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
               {loading ? "Uploading..." : "Save verification"}
             </button>
@@ -234,7 +245,7 @@ function FileInput({ label, file, onChange }: FileInputProps) {
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3">
         <div className="flex items-center gap-2 text-sm text-slate-600">
-          <Upload size={18} className="text-blue-600" />
+          <Upload size={18} className="text-emerald-600" />
           <span>{file ? file.name : "Choose file"}</span>
         </div>
         <input

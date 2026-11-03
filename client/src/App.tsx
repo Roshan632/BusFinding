@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { ToastProvider } from "./components/ToastProvider";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
@@ -71,6 +72,13 @@ import RoutesPage from "./pages/RoutesPage.tsx";
 //   );
 // }
 
+function getDefaultRouteForRole(role?: string) {
+  if (role === "admin") return "/admin";
+  if (role === "driver") return "/driver";
+  if (role === "passenger") return "/choose-role";
+  return "/choose-role";
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -86,19 +94,19 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
 
-     <Route
-  path="/login"
-  element={
-    user ? <Navigate to="/choose-role" replace /> : <Login />
-  }
-/>
+      <Route
+        path="/login"
+        element={
+          user ? <Navigate to={getDefaultRouteForRole(user.role)} replace /> : <Login />
+        }
+      />
 
-<Route
-  path="/register"
-  element={
-    user ? <Navigate to="/choose-role" replace /> : <Register />
-  }
-/>
+      <Route
+        path="/register"
+        element={
+          user ? <Navigate to={getDefaultRouteForRole(user.role)} replace /> : <Register />
+        }
+      />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -114,31 +122,39 @@ function AppRoutes() {
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
-  <Route path="/driver" element={<DriverTracking />} />
-</Route>
+        <Route path="/driver" element={<DriverTracking />} />
+      </Route>
 
       <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
         <Route path="/admin" element={<AdminDashboard />} />
       </Route>
+
       <Route element={<ProtectedRoute />}>
         <Route path="/verification" element={<VerificationPage />} />
       </Route>
+
       <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
         <Route path="/route-planner" element={<RoutePlanner />} />
       </Route>
-     <Route
-  path="/choose-role"
-  element={
-    user ? (
-      <ChooseRole />
-    ) : (
-      <Navigate to="/login" replace />
-    )
-  }
-/>
-<Route path="/live-map" element={<LiveMap/>}/>
-<Route path="/routes" element={<RoutesPage />} />
-<Route path="/terms" element={<Terms/>}/>
+
+      <Route
+        path="/choose-role"
+        element={
+          user ? (
+            user.role === "admin" ? (
+              <Navigate to="/admin" replace />
+            ) : (
+              <ChooseRole />
+            )
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      <Route path="/live-map" element={<LiveMap />} />
+      <Route path="/routes" element={<RoutesPage />} />
+      <Route path="/terms" element={<Terms />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -148,9 +164,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

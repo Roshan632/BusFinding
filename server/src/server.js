@@ -55,9 +55,15 @@ function createToken(user) {
 
 function makeDateTimeFromClock(value, referenceDate = new Date()) {
   const [hours, minutes] = String(value).split(":").map(Number);
-  const date = new Date(referenceDate);
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+  const base = new Date(referenceDate);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const day = base.getDate();
+
+  const kathmanduOffsetMinutes = 5 * 60 + 45;
+  const utcMs = Date.UTC(year, month, day, hours, minutes, 0, 0) - (kathmanduOffsetMinutes * 60 * 1000);
+
+  return new Date(utcMs);
 }
 
 async function authenticate(req, res, next) {
@@ -364,24 +370,34 @@ app.get("/api/routes/search", async (req, res) => {
 
     let queryText = `
       SELECT
-        s.id,
-        s.driver_id,
-        s.route_id,
+        COALESCE(s.id, r.id) AS id,
+        b.driver_id,
+        r.id AS route_id,
         r.name AS route_name,
         r.start_location,
         r.end_location,
-        CAST(s.departure_at AS TIME) AS departure_time,
-        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        CASE
+          WHEN s.departure_at IS NOT NULL THEN (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time
+          ELSE NULL
+        END AS departure_time,
+        CASE
+          WHEN s.expected_arrival_at IS NOT NULL THEN (s.expected_arrival_at AT TIME ZONE 'Asia/Kathmandu')::time
+          ELSE NULL
+        END AS arrival_time,
         NULL::VARCHAR(150) AS stop_name,
         NULL::TIME AS stop_time,
         u.name AS driver_name,
         b.bus_number,
-        s.created_at
-      FROM schedules s
-      LEFT JOIN routes r ON r.id = s.route_id
-      LEFT JOIN users u ON u.id = s.driver_id
-      LEFT JOIN buses b ON b.id = s.bus_id
-      WHERE s.status = 'published' AND s.is_available = TRUE
+        COALESCE(s.created_at, r.created_at) AS created_at
+      FROM public.routes r
+      LEFT JOIN public.buses b ON b.route_id = r.id AND b.status = 'active'
+      LEFT JOIN public.users u ON u.id = b.driver_id
+      LEFT JOIN public.schedules s
+        ON s.route_id = r.id
+       AND s.bus_id = b.id
+       AND s.status = 'published'
+       AND s.is_available = TRUE
+      WHERE 1 = 1
     `;
 
     const params = [];
@@ -398,13 +414,17 @@ app.get("/api/routes/search", async (req, res) => {
     }
 
     if (time) {
-      queryText += ` AND CAST(s.departure_at AS TIME) >= ($${index}::time - INTERVAL '30 minutes')`;
-      queryText += ` AND CAST(s.departure_at AS TIME) <= ($${index}::time + INTERVAL '60 minutes')`;
+      queryText += ` AND (
+        s.departure_at IS NULL OR (
+          (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time >= ($${index}::time - INTERVAL '30 minutes')
+          AND (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time <= ($${index}::time + INTERVAL '60 minutes')
+        )
+      )`;
       params.push(time);
       index += 1;
     }
 
-    queryText += ` ORDER BY CAST(s.departure_at AS TIME) ASC LIMIT 50`;
+    queryText += ` ORDER BY COALESCE((s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time, '23:59:59') ASC LIMIT 50`;
 
     const result = await query(queryText, params);
 
@@ -425,8 +445,8 @@ app.get("/api/routes", async (_req, res) => {
         r.name AS route_name,
         r.start_location,
         r.end_location,
-        CAST(s.departure_at AS TIME) AS departure_time,
-        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time AS departure_time,
+        (s.expected_arrival_at AT TIME ZONE 'Asia/Kathmandu')::time AS arrival_time,
         NULL::VARCHAR(150) AS stop_name,
         NULL::TIME AS stop_time,
         u.name AS driver_name,
@@ -436,7 +456,7 @@ app.get("/api/routes", async (_req, res) => {
       LEFT JOIN users u ON u.id = s.driver_id
       LEFT JOIN buses b ON b.id = s.bus_id
       WHERE s.status = 'published' AND s.is_available = TRUE
-      ORDER BY CAST(s.departure_at AS TIME) ASC
+      ORDER BY (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time ASC
       LIMIT 100
     `);
 
@@ -455,12 +475,18 @@ app.get("/api/passenger/route-status", async (req, res) => {
 
     let queryText = `
       SELECT
-        s.id,
+        COALESCE(s.id, r.id) AS id,
         r.name AS route_name,
         r.start_location,
         r.end_location,
-        CAST(s.departure_at AS TIME) AS departure_time,
-        CAST(s.expected_arrival_at AS TIME) AS arrival_time,
+        CASE
+          WHEN s.departure_at IS NOT NULL THEN (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time
+          ELSE NULL
+        END AS departure_time,
+        CASE
+          WHEN s.expected_arrival_at IS NOT NULL THEN (s.expected_arrival_at AT TIME ZONE 'Asia/Kathmandu')::time
+          ELSE NULL
+        END AS arrival_time,
         NULL::VARCHAR(150) AS stop_name,
         NULL::TIME AS stop_time,
         u.name AS driver_name,
@@ -471,19 +497,23 @@ app.get("/api/passenger/route-status", async (req, res) => {
         ST_Y(bl.location::geometry) AS latitude,
         ST_X(bl.location::geometry) AS longitude,
         bl.recorded_at
-      FROM schedules s
-      LEFT JOIN routes r ON r.id = s.route_id
-      LEFT JOIN users u ON u.id = s.driver_id
-      LEFT JOIN buses b ON b.id = s.bus_id
-      LEFT JOIN trips t ON t.bus_id = b.id AND t.status = 'active'
+      FROM public.routes r
+      LEFT JOIN public.buses b ON b.route_id = r.id AND b.status = 'active'
+      LEFT JOIN public.users u ON u.id = b.driver_id
+      LEFT JOIN public.schedules s
+        ON s.route_id = r.id
+       AND s.bus_id = b.id
+       AND s.status = 'published'
+       AND s.is_available = TRUE
+      LEFT JOIN public.trips t ON t.bus_id = b.id AND t.status = 'active'
       LEFT JOIN LATERAL (
         SELECT location, speed_kmh, recorded_at
-        FROM bus_locations
+        FROM public.bus_locations
         WHERE trip_id = t.id
         ORDER BY recorded_at DESC
         LIMIT 1
       ) bl ON TRUE
-      WHERE s.status = 'published' AND s.is_available = TRUE
+      WHERE 1 = 1
     `;
 
     const params = [];
@@ -500,14 +530,17 @@ app.get("/api/passenger/route-status", async (req, res) => {
     }
 
     if (time) {
-      queryText += ` AND CAST(s.departure_at AS TIME) >= ($${index}::time - INTERVAL '30 minutes')`;
-      params.push(time);
-      queryText += ` AND CAST(s.departure_at AS TIME) <= ($${index}::time + INTERVAL '90 minutes')`;
+      queryText += ` AND (
+        s.departure_at IS NULL OR (
+          (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time >= ($${index}::time - INTERVAL '30 minutes')
+          AND (s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time <= ($${index}::time + INTERVAL '90 minutes')
+        )
+      )`;
       params.push(time);
       index += 1;
     }
 
-    queryText += ` ORDER BY CAST(s.departure_at AS TIME) ASC LIMIT 25`;
+    queryText += ` ORDER BY COALESCE((s.departure_at AT TIME ZONE 'Asia/Kathmandu')::time, '23:59:59') ASC LIMIT 25`;
 
     const result = await query(queryText, params);
 
@@ -610,6 +643,12 @@ app.patch("/api/auth/role", authenticate, async (req, res) => {
   try {
     const { role } = req.body;
 
+    if (req.user.role === "admin") {
+      return res.status(403).json({
+        message: "Admin accounts are managed by the platform and cannot be changed here.",
+      });
+    }
+
     if (!['passenger', 'driver'].includes(role)) {
       return res.status(400).json({ message: "Role must be passenger or driver." });
     }
@@ -644,6 +683,7 @@ app.put("/api/profile/verification", authenticate, async (req, res) => {
       busPlateNumber,
       nidFrontUrl,
       nidBackUrl,
+      requestedRole,
     } = req.body;
 
     const normalizedPhone = typeof phone === "string" ? phone.trim() : "";
@@ -652,8 +692,10 @@ app.put("/api/profile/verification", authenticate, async (req, res) => {
     const sanitizedBusPlateNumber = typeof busPlateNumber === "string" ? busPlateNumber.trim() : null;
     const sanitizedNidFrontUrl = typeof nidFrontUrl === "string" ? nidFrontUrl.trim() : null;
     const sanitizedNidBackUrl = typeof nidBackUrl === "string" ? nidBackUrl.trim() : null;
+    const requestedRoleName = typeof requestedRole === "string" ? requestedRole.toLowerCase() : req.user.role;
+    const isDriverSubmission = requestedRoleName === "driver" || req.user.role === "driver";
 
-    if (req.user.role === "driver") {
+    if (isDriverSubmission) {
       if (
         normalizedPhone.length < 7 ||
         !sanitizedDriverLicenseUrl ||
@@ -664,9 +706,7 @@ app.put("/api/profile/verification", authenticate, async (req, res) => {
           message: "Drivers must provide a valid phone number, profile photo, license image, and bus plate number.",
         });
       }
-    }
-
-    if (req.user.role === "passenger") {
+    } else {
       if (!sanitizedNidFrontUrl || !sanitizedNidBackUrl) {
         return res.status(400).json({
           message: "Passengers must upload both NID card images.",
@@ -860,6 +900,62 @@ app.post("/api/admin/routes",
     } catch (error) {
       console.error("Admin route create failed:", error.message);
       return res.status(500).json({ message: "Could not create route." });
+    }
+  }
+);
+
+app.patch("/api/admin/users/:id",
+  authenticate,
+  allowRoles("admin"),
+  async (req, res) => {
+    const { id } = req.params;
+    const { role, status } = req.body;
+
+    if (!isValidUuid(id)) {
+      return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    if (id === req.user.id) {
+      return res.status(400).json({ message: "You cannot edit your own admin account from here." });
+    }
+
+    const nextRole = typeof role === "string" ? role : null;
+    const nextStatus = typeof status === "string" ? status : null;
+
+    if (nextRole && !['passenger', 'driver', 'admin'].includes(nextRole)) {
+      return res.status(400).json({ message: "Role must be passenger, driver, or admin." });
+    }
+
+    if (nextStatus && !['active', 'suspended'].includes(nextStatus)) {
+      return res.status(400).json({ message: "Status must be active or suspended." });
+    }
+
+    if (!nextRole && !nextStatus) {
+      return res.status(400).json({ message: "Provide a role or status change." });
+    }
+
+    try {
+      const result = await query(
+        `UPDATE users
+         SET role = COALESCE($1, role),
+             status = COALESCE($2, status),
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING id, name, email, role, status, phone, created_at`,
+        [nextRole, nextStatus, id]
+      );
+
+      if (!result.rows[0]) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      return res.json({
+        message: "User account updated successfully.",
+        user: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Admin user update failed:", error.message);
+      return res.status(500).json({ message: "Could not update the user." });
     }
   }
 );
@@ -1112,10 +1208,9 @@ app.patch(
         });
       }
 
-      if (
-        driverRequest.user_status !== "active" ||
-        driverRequest.role !== "passenger"
-      ) {
+      const effectiveRole = driverRequest.role ?? "passenger";
+
+      if (driverRequest.user_status !== "active" || effectiveRole === "admin") {
         await client.query("ROLLBACK");
 
         return res.status(409).json({
@@ -1174,6 +1269,166 @@ app.patch(
   }
 );
 
+// Driver: save or update the bus and route details for their approved account
+app.post(
+  "/api/driver/bus-profile",
+  authenticate,
+  allowRoles("driver"),
+  async (req, res) => {
+    try {
+      const busNumber = String(req.body.busNumber || "").trim();
+      const registrationNumber = String(req.body.registrationNumber || "").trim();
+      const routeName = String(req.body.routeName || "").trim();
+      const startLocation = String(req.body.startLocation || "").trim();
+      const endLocation = String(req.body.endLocation || "").trim();
+      const departureTime = String(req.body.departureTime || "").trim();
+      const arrivalTime = String(req.body.arrivalTime || "").trim();
+
+      if (!busNumber || !routeName || !startLocation || !endLocation || !departureTime || !arrivalTime) {
+        return res.status(400).json({
+          message: "Bus number, route name, start location, end location, start time, and end time are required.",
+        });
+      }
+
+      const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+      if (!timePattern.test(departureTime) || !timePattern.test(arrivalTime)) {
+        return res.status(400).json({
+          message: "Bus start and end times must use HH:MM format.",
+        });
+      }
+
+      const latestRequest = await query(
+        `SELECT status
+         FROM public.driver_requests
+         WHERE user_id = $1
+         ORDER BY requested_at DESC
+         LIMIT 1`,
+        [req.user.id]
+      );
+
+      if (!latestRequest.rows[0] || latestRequest.rows[0].status !== "approved") {
+        return res.status(403).json({
+          message: "Your driver request must be approved before adding bus details.",
+        });
+      }
+
+      let route = await query(
+        `SELECT id, name, start_location, end_location, is_active
+         FROM public.routes
+         WHERE LOWER(name) = LOWER($1)
+           AND LOWER(start_location) = LOWER($2)
+           AND LOWER(end_location) = LOWER($3)
+         LIMIT 1`,
+        [routeName, startLocation, endLocation]
+      );
+
+      if (!route.rows[0]) {
+        route = await query(
+          `INSERT INTO public.routes (name, start_location, end_location, is_active)
+           VALUES ($1, $2, $3, TRUE)
+           RETURNING id, name, start_location, end_location, is_active`,
+          [routeName, startLocation, endLocation]
+        );
+      }
+
+      const routeRecord = route.rows[0];
+      const existingBus = await query(
+        `SELECT id, bus_number, registration_number, route_id, driver_id
+         FROM public.buses
+         WHERE driver_id = $1
+         LIMIT 1`,
+        [req.user.id]
+      );
+
+      let busResult;
+
+      if (existingBus.rows[0]) {
+        busResult = await query(
+          `UPDATE public.buses
+           SET bus_number = $1,
+               registration_number = COALESCE(NULLIF($2, ''), registration_number),
+               route_id = $3,
+               status = 'active',
+               updated_at = NOW()
+           WHERE id = $4
+           RETURNING id, bus_number, registration_number, route_id, driver_id, status`,
+          [busNumber, registrationNumber, routeRecord.id, existingBus.rows[0].id]
+        );
+      } else {
+        busResult = await query(
+          `INSERT INTO public.buses (bus_number, registration_number, route_id, driver_id, status)
+           VALUES ($1, $2, $3, $4, 'active')
+           RETURNING id, bus_number, registration_number, route_id, driver_id, status`,
+          [busNumber, registrationNumber || null, routeRecord.id, req.user.id]
+        );
+      }
+
+      const bus = busResult.rows[0];
+
+      const departureDateTime = makeDateTimeFromClock(departureTime);
+      const arrivalDateTime = makeDateTimeFromClock(arrivalTime, departureDateTime);
+      if (arrivalDateTime < departureDateTime) {
+        arrivalDateTime.setDate(arrivalDateTime.getDate() + 1);
+      }
+
+      const existingSchedule = await query(
+        `SELECT id
+         FROM public.schedules
+         WHERE driver_id = $1
+           AND bus_id = $2
+           AND route_id = $3
+           AND status = 'published'
+         LIMIT 1`,
+        [req.user.id, bus.id, routeRecord.id]
+      );
+
+      if (existingSchedule.rows[0]) {
+        await query(
+          `UPDATE public.schedules
+           SET departure_at = $1,
+               expected_arrival_at = $2,
+               is_available = TRUE,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [departureDateTime, arrivalDateTime, existingSchedule.rows[0].id]
+        );
+      } else {
+        await query(
+          `INSERT INTO public.schedules (driver_id, bus_id, route_id, departure_at, expected_arrival_at, status, is_available)
+           VALUES ($1, $2, $3, $4, $5, 'published', TRUE)`,
+          [req.user.id, bus.id, routeRecord.id, departureDateTime, arrivalDateTime]
+        );
+      }
+
+      return res.status(201).json({
+        message: "Bus details saved successfully.",
+        assignment: {
+          bus_id: bus.id,
+          bus_number: bus.bus_number,
+          route_id: bus.route_id,
+          route_name: routeRecord.name,
+          start_location: routeRecord.start_location,
+          end_location: routeRecord.end_location,
+          departure_time: departureTime,
+          arrival_time: arrivalTime,
+        },
+      });
+    } catch (error) {
+      console.error("Driver bus profile save failed:", error.message);
+
+      if (error.code === "23505") {
+        return res.status(409).json({
+          message: "A bus with this number already exists. Use a unique bus number.",
+        });
+      }
+
+      return res.status(500).json({
+        message: "Could not save bus details.",
+      });
+    }
+  }
+);
+
 // Driver: check the bus and route assigned to this account
 app.get(
   "/api/driver/assignment",
@@ -1188,9 +1443,17 @@ app.get(
            b.route_id,
            r.name AS route_name,
            r.start_location,
-           r.end_location
+           r.end_location,
+           CASE WHEN s.departure_at IS NOT NULL THEN TO_CHAR(s.departure_at AT TIME ZONE 'Asia/Kathmandu', 'HH24:MI') ELSE '08:00' END AS departure_time,
+           CASE WHEN s.expected_arrival_at IS NOT NULL THEN TO_CHAR(s.expected_arrival_at AT TIME ZONE 'Asia/Kathmandu', 'HH24:MI') ELSE '09:30' END AS arrival_time
          FROM public.buses b
          JOIN public.routes r ON r.id = b.route_id
+         LEFT JOIN public.schedules s
+           ON s.bus_id = b.id
+          AND s.route_id = r.id
+          AND s.driver_id = $1
+          AND s.status = 'published'
+          AND s.is_available = TRUE
          WHERE b.driver_id = $1
            AND b.status = 'active'
            AND r.is_active = TRUE
@@ -1435,11 +1698,18 @@ io.on("connection", (socket) => {
   });
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 5000;
 
 try {
   await ensureDatabaseSchema();
   await ensureDefaultAdmin();
+
+  const dbInfo = await query(
+    `SELECT current_database() AS database_name, current_user AS database_user;`
+  );
+  const { database_name, database_user } = dbInfo.rows[0] || {};
+
+  console.log(`Database connected: ${database_name} (user: ${database_user})`);
   console.log("Database schema check completed.");
 } catch (error) {
   console.error("Database setup failed:", error.message);

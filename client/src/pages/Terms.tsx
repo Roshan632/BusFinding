@@ -63,7 +63,7 @@ export default function Terms() {
 
         <Link
           to="/register"
-          className="mt-8 inline-flex rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+          className="mt-8 inline-flex rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700"
         >
           Return to registration
         </Link>

@@ -71,7 +71,7 @@ export default function RoutePlanner() {
       <div className="mx-auto max-w-3xl">
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-blue-600 p-3 text-white">
+            <div className="rounded-xl bg-emerald-600 p-3 text-white">
               <BusFront size={24} />
             </div>
             <div>
@@ -88,31 +88,31 @@ export default function RoutePlanner() {
         <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="Route name" icon={<RouteIcon size={18} />}>
-              <input value={routeName} onChange={(e) => setRouteName(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="e.g. Banepa to Kathmandu" required />
+              <input value={routeName} onChange={(e) => setRouteName(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="e.g. Banepa to Kathmandu" required />
             </Field>
 
             <Field label="Start location" icon={<MapPin size={18} />}>
-              <input value={startLocation} onChange={(e) => setStartLocation(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="Origin" required />
+              <input value={startLocation} onChange={(e) => setStartLocation(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="Origin" required />
             </Field>
 
             <Field label="End location" icon={<MapPin size={18} />}>
-              <input value={endLocation} onChange={(e) => setEndLocation(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="Destination" required />
+              <input value={endLocation} onChange={(e) => setEndLocation(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="Destination" required />
             </Field>
 
             <Field label="Departure time" icon={<Clock3 size={18} />}>
-              <input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" required />
+              <input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" required />
             </Field>
 
             <Field label="Arrival time" icon={<Clock3 size={18} />}>
-              <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" required />
+              <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" required />
             </Field>
 
             <Field label="Stop name (optional)" icon={<MapPin size={18} />}>
-              <input value={stopName} onChange={(e) => setStopName(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" placeholder="e.g. Ratna Park" />
+              <input value={stopName} onChange={(e) => setStopName(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" placeholder="e.g. Ratna Park" />
             </Field>
 
             <Field label="Stop time (optional)" icon={<Clock3 size={18} />}>
-              <input type="time" value={stopTime} onChange={(e) => setStopTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-blue-600" />
+              <input type="time" value={stopTime} onChange={(e) => setStopTime(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 outline-none focus:border-emerald-600" />
             </Field>
           </div>
 
@@ -125,7 +125,7 @@ export default function RoutePlanner() {
           )}
 
           <div className="mt-6 flex items-center gap-3">
-            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
               <Save size={18} />
               {loading ? "Saving..." : "Save schedule"}
             </button>
